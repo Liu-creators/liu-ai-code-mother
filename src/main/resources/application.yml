@@ -8,9 +8,6 @@ server:
   servlet:
     context-path: /api
 
-
-
-
 springdoc:
   group-configs:
     - group: "default"
