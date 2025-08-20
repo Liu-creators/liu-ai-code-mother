@@ -4,7 +4,6 @@ import cn.hutool.core.bean.BeanUtil;
 import com.liu.liuaicodemother.annotation.AuthCheck;
 import com.liu.liuaicodemother.common.BaseResponse;
 import com.liu.liuaicodemother.common.DeleteRequest;
-import com.liu.liuaicodemother.common.PageRequest;
 import com.liu.liuaicodemother.common.ResultUtils;
 import com.liu.liuaicodemother.constant.UserConstant;
 import com.liu.liuaicodemother.exception.BusinessException;
@@ -175,8 +174,6 @@ public class UserController {
         userVOPage.setRecords(userVOList);
         return ResultUtils.success(userVOPage);
     }
-
-
 
 }
 
