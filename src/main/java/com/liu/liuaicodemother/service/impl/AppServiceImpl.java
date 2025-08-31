@@ -7,6 +7,7 @@ import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import com.liu.liuaicodemother.constant.AppConstant;
 import com.liu.liuaicodemother.core.AiCodeGeneratorFacade;
+import com.liu.liuaicodemother.core.handler.StreamHandlerExecutor;
 import com.liu.liuaicodemother.exception.BusinessException;
 import com.liu.liuaicodemother.exception.ErrorCode;
 import com.liu.liuaicodemother.exception.ThrowUtils;
@@ -54,6 +55,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
 
     @Autowired
     private ChatHistoryService chatHistoryService;
+
+    @Autowired
+    private StreamHandlerExecutor streamHandlerExecutor;
 
     @Override
     public AppVO getAppVO(App app) {
@@ -138,25 +142,13 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         if (codeGenTypeEnum == null) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持的代码生成类型");
         }
-        // 5. 添加用户消息到对话历史
+        // 5. 通过校验后，添加用户消息到对话历史
         chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
-        
-        // 6. 调用 AI 生成代码，并处理结果
-        StringBuilder aiResponseBuilder = new StringBuilder();
-        return aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId)
-                .doOnNext(chunk -> {
-                    // 累积AI响应内容
-                    aiResponseBuilder.append(chunk);
-                })
-                .doOnComplete(() -> {
-                    // 流式返回完成后，保存 AI 消息到对话历史中
-                    String aiResponse = aiResponseBuilder.toString();
-                    chatHistoryService.addChatMessage(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
-                }).doOnError(error -> {
-                    // 如果 AI 回复失败，也需要保存记录到数据库中
-                    String errorMessage = "AI 回复失败：" + error.getMessage();
-                    chatHistoryService.addChatMessage(appId, errorMessage, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
-                });
+        // 6. 调用 AI 生成代码（流式）
+        Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId);
+        // 7. 收集 AI 响应内容并在完成后记录到对话历史
+        return streamHandlerExecutor.doExecute(codeStream, chatHistoryService, appId, loginUser, codeGenTypeEnum);
+
     }
 
     @Override
